@@ -155,6 +155,7 @@ get_sql_query_tool = {
       'Generate a single valid SQL SELECT query to retrieve the desired information.\n\n'
       'Guidelines:\n'
       '- Only generate **SELECT** statements. No INSERT, UPDATE, DELETE, etc.\n'
+      '- Avoid Select * statements and use explicit column names or aliases.\n'
       '- The query must be complete and executable on its own. Avoid multi-statement or procedural SQL.\n'
       '- If using **aggregate functions** like COUNT, SUM, AVG, etc., always use an **alias** (e.g., COUNT(*) AS total_count).\n'
       '- You can use **nested subqueries**, but the final output must be a **single query**.\n'
