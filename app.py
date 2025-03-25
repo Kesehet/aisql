@@ -4,17 +4,16 @@ from functions.run import get_sql_query, context
 from flask_cors import CORS
 import dotenv
 import os
+from waitress import serve
 
 dotenv.load_dotenv()
-
-
-
-
-
 
 app = Flask(__name__, static_folder='build', template_folder='build')
 
 CORS(app)
+
+FAKE_CHARTS = os.getenv("FAKE_CHARTS") == "true" or os.getenv("FAKE_CHARTS") == "1" or os.getenv("FAKE_CHARTS") == "True"
+DEBUG = os.getenv("DEBUG") == "true" or os.getenv("DEBUG") == "1" or os.getenv("DEBUG") == "True"
 
 # Serve static files and fallback to index.html for React-style routing
 @app.route('/', defaults={'path': ''})
@@ -31,14 +30,15 @@ def process_request():
         data = request.form
     else:
         data = request.get_json()
+    if FAKE_CHARTS:
+        return {
+            "query": "SELECT column1, column2, column3 FROM table1",
+            "result": [
+                ["column1", "column2", "column3"],
+                [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+            ]
+        }
     
-    return {
-        "query": "SELECT column1, column2, column3 FROM table1",
-        "result": [
-            ["column1", "column2", "column3"],
-            [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-        ]
-    }
     print("User Query:",data['query'])
     response = get_sql_query(data['query'])
     return response
@@ -64,4 +64,8 @@ def update_context():
     return jsonify(context)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    if not DEBUG:
+        serve(app, host="0.0.0.0", port=5000)
+    else:
+        app.run(debug=DEBUG)
+

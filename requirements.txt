@@ -25,6 +25,7 @@ pydantic==2.10.6
 pydantic_core==2.27.2
 pyngrok==7.2.3
 python-dateutil==2.9.0.post0
+python-dotenv==1.0.1
 python-ngrok==0.1
 pytz==2025.1
 PyYAML==6.0.2
@@ -35,4 +36,5 @@ soupsieve==2.6
 typing_extensions==4.12.2
 tzdata==2025.1
 urllib3==2.3.0
+waitress==3.0.2
 Werkzeug==3.1.3
