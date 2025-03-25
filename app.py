@@ -33,7 +33,7 @@ def process_request():
         data = request.get_json()
     
     return {
-        "query": data['query'],
+        "query": "SELECT column1, column2, column3 FROM table1",
         "result": [
             ["column1", "column2", "column3"],
             [[1, 2, 3], [4, 5, 6], [7, 8, 9]]

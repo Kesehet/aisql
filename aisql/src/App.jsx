@@ -26,7 +26,16 @@ const App = () => {
             key={idx}
             onClick={() => setSelectedQuery(q)}
             style={{ cursor: "pointer" }}
-            className="w3-third w3-padding w3-animate-zoom"
+            className={
+              "w3-padding w3-animate-zoom" +
+              (q.length < 20
+                ? " w3-third"
+                : q.length < 40
+                ? " w3-half"
+                : q.length < 80
+                ? " w3-quarter"
+                : "")
+            }
           >
             <QueryCard query={q} />
           </div>

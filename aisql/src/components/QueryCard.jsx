@@ -9,6 +9,7 @@ const QueryCard = ({ query, chartType = "bar" }) => {
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState(null);
   const [response, setResponse] = useState(null);
+  const [sqlQuery, setSqlQuery] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -28,7 +29,9 @@ const QueryCard = ({ query, chartType = "bar" }) => {
         const yFields = headers.slice(1);
         const config = { chartType, xField, yFields };
         const data = createChartData(result, config);
+
         setChartData(data);
+        setSqlQuery(result.query);
       }
 
       setLoading(false);
@@ -46,7 +49,12 @@ const QueryCard = ({ query, chartType = "bar" }) => {
                 <ProgressSpinner />
             </div>
         ) : chartData ? (
+            <>
                 <ChartDisplay chartType={chartType} chartData={chartData} title={query} />
+                <pre>
+                    <code>{sqlQuery}</code>
+                </pre>
+            </>
         ) : (
             <p>No data to display.</p>
         )}
