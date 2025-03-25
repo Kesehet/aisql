@@ -31,6 +31,7 @@ def process_request():
         data = request.form
     else:
         data = request.get_json()
+    print("User Query:",data['query'])
     response = get_sql_query(data['query'])
     return response
 
