@@ -1,43 +1,53 @@
 import React, { useState } from "react";
-import { Card } from "primereact/card";
-import { Chart } from "primereact/chart";
+import { Dialog } from "primereact/dialog";
 import QueryForm from "./components/QueryForm";
-import ResponseDisplay from "./components/ResponseDisplay";
-import ChartDisplay from "./components/ChartDisplay";
-import { createChartData } from "./utils/chartUtils";
+import QueryCard from "./components/QueryCard";
 
 const App = () => {
   const [query, setQuery] = useState("");
-  const [response, setResponse] = useState(null);
-  const [chartData, setChartData] = useState(null);
-  const [chartType, setChartType] = useState("bar");
+  const [submittedQueries, setSubmittedQueries] = useState([]);
+  const [selectedQuery, setSelectedQuery] = useState(null);
 
-  const onSubmit = async (event) => {
+  const onSubmit = (event) => {
     event.preventDefault();
-    const res = await fetch("http://localhost:5000/request", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
-    });
-
-    const result = await res.json();
-    setResponse(result);
-
-    if (result?.result) {
-      const [headers] = result.result;
-      const xField = headers[0];
-      const yFields = headers.slice(1);
-      const config = { chartType, xField, yFields };
-      const data = createChartData(result, config);
-      setChartData(data);
+    if (query.trim()) {
+      setSubmittedQueries((prev) => [...prev, query]);
+      setQuery("");
     }
   };
 
   return (
-    <div className="p-4 flex flex-column align-items-center">
+    <div className="w3-container">
       <QueryForm query={query} setQuery={setQuery} onSubmit={onSubmit} />
-      {chartData && <ChartDisplay chartType={chartType} chartData={chartData} />}
-      {response && <ResponseDisplay response={response} />}
+
+      <div className="w3-row" >
+        {submittedQueries.map((q, idx) => (
+          <div
+            key={idx}
+            onClick={() => setSelectedQuery(q)}
+            style={{ cursor: "pointer" }}
+            className="w3-third w3-padding w3-animate-zoom"
+          >
+            <QueryCard query={q} />
+          </div>
+        ))}
+      </div>
+
+
+
+      <Dialog
+        visible={!!selectedQuery}
+        style={{ width: "90vw",}}
+        onHide={() => setSelectedQuery(null)}
+        maximizable
+        modal
+      >
+        {selectedQuery && (
+          
+            <QueryCard query={selectedQuery} />
+          
+        )}
+      </Dialog>
     </div>
   );
 };

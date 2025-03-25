@@ -31,6 +31,14 @@ def process_request():
         data = request.form
     else:
         data = request.get_json()
+    
+    return {
+        "query": data['query'],
+        "result": [
+            ["column1", "column2", "column3"],
+            [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+        ]
+    }
     print("User Query:",data['query'])
     response = get_sql_query(data['query'])
     return response
