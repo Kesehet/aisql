@@ -35,7 +35,7 @@ const DatabaseSetup = ({ onSuccess }) => {
       for (const file of csvFiles) {
         const csvString = await readFileAsText(file);
 
-        const response = await fetch("http://localhost:5000/create-database", {
+        const response = await fetch("http://"+window.location.hostname+"/create-database", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
