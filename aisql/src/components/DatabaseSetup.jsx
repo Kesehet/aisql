@@ -34,7 +34,7 @@ const DatabaseSetup = ({ onSuccess }) => {
     try {
       for (const file of csvFiles) {
         const csvString = await readFileAsText(file);
-        const baseURL = `${window.location.protocol}//${window.location.hostname}:${window.location.port}/request`;
+        const baseURL = `${window.location.protocol}//${window.location.hostname}:${window.location.port}/create-database`;
 
 
         const response = await fetch(baseURL, {
