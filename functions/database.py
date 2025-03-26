@@ -6,11 +6,17 @@ from difflib import SequenceMatcher
 
 data = pd.read_csv('data.csv')
 
-def get_sql_database_structure():
-    sql = SqlConn()
+def get_sql_database_structure(db_name='user001.starter.db'):
+    sql = SqlConn(db_name)
     columns = sql.get_database_structure()
 
     return columns
+
+def get_table_list_in_database(db_name='user001.starter.db'):
+    sql = SqlConn(db_name)
+    columns = sql.get_database_structure()
+
+    return list(columns['tables'].keys())
 
 def extract_keywords(text):
     '''
@@ -31,7 +37,7 @@ def extract_keywords(text):
     
     return keywords
 
-def validate_keywords(keywords, sensitivity=0.8):
+def validate_keywords(keywords, sensitivity=0.8, db_name='user001.starter.db'):
     """
     Validates a list of keywords by checking if they roughly match table or column names.
     Filters out generic/common keywords and those that match too many tables.
@@ -50,7 +56,7 @@ def validate_keywords(keywords, sensitivity=0.8):
         "is_active", "enabled", "flag", "description"
     }
 
-    db_structure = get_sql_database_structure()
+    db_structure = get_sql_database_structure(db_name)
     tables = db_structure.get("tables", {})
 
     valid_keywords = []
@@ -81,14 +87,14 @@ def validate_keywords(keywords, sensitivity=0.8):
     
     
 
-def find_table_and_column_by_keywords(keywords, sensitivity=0.8):
-    sql = SqlConn()
+def find_table_and_column_by_keywords(keywords, sensitivity=0.8, db_name='user001.starter.db'):
+    sql = SqlConn(db_name)
     return sql.find_table_and_column_by_keywords(keywords, sensitivity)
 
 
-def get_sql_query(query):
+def get_sql_query(query, db_name='user001.starter.db'):
     print("Executing SQL Query: " + str(query))
-    sql = SqlConn()
+    sql = SqlConn(db_name)
     return {"query": query, "result": sql.execute(query)}
 
 def get_database_structure_as_context():

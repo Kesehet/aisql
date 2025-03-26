@@ -1,63 +1,39 @@
-import React, { useState } from "react";
-import { Dialog } from "primereact/dialog";
-import QueryForm from "./components/QueryForm";
-import QueryCard from "./components/QueryCard";
+import React, { useState, useEffect } from "react";
+import DatabaseSetup from "./components/DatabaseSetup";
+import MainApp from "./components/MainApp";
 
 const App = () => {
-  const [query, setQuery] = useState("");
-  const [submittedQueries, setSubmittedQueries] = useState([]);
-  const [selectedQuery, setSelectedQuery] = useState(null);
+  const [dbReady, setDbReady] = useState(false);
+  const [dbName, setDbName] = useState(null);
 
-  const onSubmit = (event) => {
-    event.preventDefault();
-    if (query.trim()) {
-      setSubmittedQueries((prev) => [...prev, query]);
-      setQuery("");
+  useEffect(() => {
+    const savedDb = localStorage.getItem("databaseName");
+    const expiry = localStorage.getItem("databaseExpiry");
+    if (savedDb && expiry && new Date().getTime() < Number(expiry)) {
+      setDbName(savedDb);
+      setDbReady(true);
     }
+  }, []);
+
+  const handleDatabaseCreated = (name) => {
+    const expiry = new Date().getTime() + 2 * 24 * 60 * 60 * 1000; // 2 days
+    localStorage.setItem("databaseName", name);
+    localStorage.setItem("databaseExpiry", expiry);
+    setDbName(name);
+    setDbReady(true);
   };
 
-  return (
-    <div className="w3-container">
-      <QueryForm query={query} setQuery={setQuery} onSubmit={onSubmit} />
+  const handleResetDatabase = () => {
+    localStorage.removeItem("databaseName");
+    localStorage.removeItem("databaseExpiry");
+    setDbName(null);
+    setDbReady(false);
+  };
 
-      <div className="w3-row" >
-        {submittedQueries.map((q, idx) => (
-          <div
-            key={idx}
-            onClick={() => setSelectedQuery(q)}
-            style={{ cursor: "pointer" }}
-            className={
-              "w3-padding w3-animate-zoom" +
-              (q.length < 20
-                ? " w3-third"
-                : q.length < 40
-                ? " w3-half"
-                : q.length < 80
-                ? " w3-quarter"
-                : "")
-            }
-          >
-            <QueryCard query={q} />
-          </div>
-        ))}
-      </div>
-
-
-
-      <Dialog
-        visible={!!selectedQuery}
-        style={{ width: "90vw",}}
-        onHide={() => setSelectedQuery(null)}
-        maximizable
-        modal
-      >
-        {selectedQuery && (
-          
-            <QueryCard query={selectedQuery} />
-          
-        )}
-      </Dialog>
-    </div>
+  return dbReady ? (
+    <MainApp dbName={dbName} onReset={handleResetDatabase} />
+  ) : (
+    <DatabaseSetup onSuccess={handleDatabaseCreated} />
   );
 };
 

@@ -3,12 +3,11 @@ import ollama
 from typing import Dict, Any, Callable
 import json
 import os
-from functions.sql import SqlConn
 
 # internal imports
 from functions.database import get_database_structure_as_context
 from functions.database import get_sql_query, get_sql_query_tool
-from functions.database import extract_keywords, extract_keywords_tool, validate_keywords
+from functions.database import extract_keywords, extract_keywords_tool, validate_keywords, get_table_list_in_database
 from functions.database import find_table_and_column_by_keywords, find_table_and_column_by_keywords_tool
 context = []
 tools = [get_sql_query_tool]
@@ -77,7 +76,7 @@ def get_response(prompt: str, use_tools: bool = True) -> Any:
 
     return returner
 
-def ask(context: list, tools: list) -> str:
+def ask(context: list, tools: list, db_name: str = 'user001.starter.db') -> str:
     # Warn if more than 1 tool is used
     if len(tools) > 1:
         print('Warning: More than 1 tool is being used. This is not supported.')
@@ -92,17 +91,29 @@ def ask(context: list, tools: list) -> str:
         for tool in response.message.tool_calls:
             # print('Calling function:', tool.function.name)
             if function_to_call := available_functions.get(tool.function.name):
+                # if function has optional argument called db_name and it is not provided, use the default db_name
+                if 'db_name' in function_to_call.__code__.co_varnames and 'db_name' not in tool.function.arguments:
+                    print('Using default db_name:', db_name)
+                    tool.function.arguments['db_name'] = db_name
                 return function_to_call(**tool.function.arguments)
     print("Warning: No tool call was made.", response.message.tool_calls)
     return response
 
-def add_to_context(context: list, role: str, content: str) -> list:
+def add_to_context(context: list, role: str, content: str = '', file_name: str = 'context') -> list:
     context.append({'role': role, 'content': content})
-    with open('context.json', 'w') as f:
+    if not os.path.exists("context"):
+        os.makedirs("context")
+    with open( "context/"+file_name + '.json', 'w') as f:
         json.dump(context, f, indent=4)
     return context
 
-def get_sql_query(prompt: str, context: list = None) -> str:
+def random_string(length: int) -> str:
+    import string
+    import random
+    letters = string.ascii_lowercase
+    return ''.join(random.choice(letters) for i in range(length))
+
+def get_sql_query(prompt: str, context: list = None, db_name: str = 'user001.starter.db') -> str:
     '''
     Step 1: Extract keywords from the user's request.
     '''
@@ -116,42 +127,51 @@ def get_sql_query(prompt: str, context: list = None) -> str:
     Return a comma-separated list of single-word keywords (no spaces), capturing the full scope of the request's meaning.
     """)
 
+    context_file_name = ".".join([db_name, random_string(10),'json'])
 
-    keywords = ask(context, [extract_keywords_tool])
+    
+    tables = get_table_list_in_database(db_name=db_name)
     sub_keywords = extract_keywords(prompt)
-    keywords = validate_keywords(sub_keywords + keywords)
-    context = add_to_context(context, 'assistant', f'Are these valid keywords? {", ".join(keywords)}.')
 
-    '''
-    Step 2: Validate keywords with the user.
-    '''
+    if len(tables) <= 2:
+        print('Tables were less than or equal to 2:', tables)
+        raw_keywords = list(tables)
+    else:
+        raw_keywords = ask(context, [extract_keywords_tool], db_name=db_name)
+
+    keywords = validate_keywords(sub_keywords + raw_keywords, db_name=db_name)
+    context = add_to_context(context, 'assistant', f'Are these valid keywords? {", ".join(keywords)}.', file_name=context_file_name)
+
+    # Step 2: Validate keywords with the user
     max_attempts = 3
     attempts = 0
     while len(keywords) == 0 and attempts < max_attempts:
         context = add_to_context(context, 'user', f'''
         None of the keywords were found in the database.
         Please confirm or provide the correct keywords for the prompt: 
-        ```{prompt}```
-        ''')
-        keywords = ask(context, [extract_keywords_tool])
-        keywords = validate_keywords(sub_keywords + keywords)
-        context = add_to_context(context, 'assistant', f'Are these valid keywords? {", ".join(keywords)}.')
+        ```{prompt}```''', file_name=context_file_name)
+
+        raw_keywords = ask(context, [extract_keywords_tool], db_name=db_name)
+        keywords = validate_keywords(sub_keywords + raw_keywords, db_name=db_name)
+        print("Keywords finalized are ", keywords)
+        context = add_to_context(context, 'assistant', f'Are these valid keywords? {", ".join(keywords)}.', file_name=context_file_name)
         attempts += 1
 
     if len(keywords) == 0:
         raise Exception('No valid keywords found.')
 
     print('Keywords:', keywords)
-    context = add_to_context(context, 'user', f'Yes, {", ".join(keywords)} are valid.')
+    context = add_to_context(context, 'user', f'Yes, {", ".join(keywords)} are valid.', file_name=context_file_name)
+
 
     
 
     '''
     Step 3: Identify relevant tables and columns using the confirmed keywords.
     '''
-    table_and_column = find_table_and_column_by_keywords(keywords)
+    table_and_column = find_table_and_column_by_keywords(keywords, db_name=db_name)
     print('Table and Column:', table_and_column)
-    context = add_to_context(context, 'assistant', f'Table and Column: {table_and_column}')
+    context = add_to_context(context, 'assistant', f'Table and Column: {table_and_column}', file_name=context_file_name)
 
     '''
     Step 4: Request generation and execution of the SQL query based on the original prompt.
@@ -159,7 +179,7 @@ def get_sql_query(prompt: str, context: list = None) -> str:
     add_to_context(context, 'user', f'''
     Thanks. Can you prepare and run the SQL query for my original request?
     {prompt}
-    ''')
+    ''', file_name=context_file_name)
 
     attempts = 0
     max_attempts = 3
@@ -167,19 +187,19 @@ def get_sql_query(prompt: str, context: list = None) -> str:
 
     while attempts < max_attempts:
         try:
-            sql_query = ask(context, [get_sql_query_tool])
+            sql_query = ask(context, [get_sql_query_tool], db_name=db_name)
             if sql_query and sql_query.get("query"):
                 print('SQL Query:', sql_query.get("query"))
                 context = add_to_context(context, 'assistant', f'SQL Query: {sql_query.get("query")}')
                 break
         except Exception as e:
             print(f'Attempt {attempts + 1} failed with error: {e}')
-            context = add_to_context(context, 'tool', f'Error: {e}')
+            context = add_to_context(context, 'tool', f'Error: {e}', file_name=context_file_name)
             context = add_to_context(context, 'user', f'''
             Just a reminder of the original request: {prompt}
             Keywords: {keywords}
             Table and Column: {table_and_column}
-            ''')
+            ''', file_name=context_file_name)
         attempts += 1
 
     if not sql_query or not sql_query.get("query"):

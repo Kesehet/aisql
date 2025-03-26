@@ -21,4 +21,6 @@ yarn-error.log*
 coverage/
 cypress/screenshots/
 cypress/videos/
+context/*
+databases/*
 

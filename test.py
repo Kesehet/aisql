@@ -88,7 +88,10 @@ save_to_html("""
     """)
     
 
-
+import requests
+req = requests.post('http://localhost:5000/create-database', json={'csv_title':'invoices', 'csv_string': open('data.csv').read(), 'db_name':'user001.starter.db'})
+print(req.text)
+exit(0)
 
 
 ### 🟪 **Combined Queries**

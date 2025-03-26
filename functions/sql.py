@@ -1,68 +1,69 @@
-import mariadb
+import sqlite3
 import difflib
 import yaml
+import pandas as pd
+import os
 
 class SqlConn:
-    def __init__(self, host='localhost', user='root', password='', database='archisty'):
-        self.host = host
-        self.user = user
-        self.password = password
-        self.database = database
-        self.conn = mariadb.connect(
-            user=self.user,
-            password=self.password,
-            host=self.host,
-            database=self.database
-        )
+    base_path = './databases/'  # Set your desired base path
+    def __init__(self, db_name="user001.starter.db" ):
+        if not os.path.exists(self.base_path):
+            os.makedirs(self.base_path)
+        print("------Database path:", self.base_path , db_name)
+        self.db_path = self.base_path + db_name
+
+        if not os.path.exists(self.db_path):
+            raise FileNotFoundError(f"Database file not found: {self.db_path}")
+        self.conn = sqlite3.connect(self.db_path)
+        self.conn.row_factory = sqlite3.Row  # So we can get column names easily
 
     def execute(self, query, params=None):
         cur = self.conn.cursor()
-        cur.execute(query, params)
+        if params:
+            cur.execute(query, params)
+        else:
+            cur.execute(query)
+
         headers = [desc[0] for desc in cur.description] if cur.description else []
-        res = cur.fetchall()
+        rows = cur.fetchall()
+
+        # Convert sqlite3.Row to list
+        result_rows = [list(row) for row in rows]
+
         cur.close()
-        return headers, res
+        return headers, result_rows
+
 
     def get_database_structure(self):
         cur = self.conn.cursor()
-        
-        cur.execute("SHOW TABLES")
+
+        # Get list of tables
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
         tables = cur.fetchall()
-        
-        db_structure = {"database": self.database, "tables": {}}
-        
-        for table in tables:
-            table_name = table[0]
-            cur.execute(f"SHOW COLUMNS FROM {table_name}")
+
+        db_structure = {"database": self.db_path, "tables": {}}
+
+        for table_row in tables:
+            table_name = table_row[0]
+            cur.execute(f"PRAGMA table_info('{table_name}')")
             columns = cur.fetchall()
-            
+
             db_structure["tables"][table_name] = []
             for column in columns:
                 column_info = {
-                    "Field": column[0],
-                    "Type": column[1],
-                    "Null": column[2],
-                    "Key": column[3],
-                    "Default": column[4],
-                    "Extra": column[5]
+                    "Field": column["name"],
+                    "Type": column["type"],
+                    "Null": "YES" if column["notnull"] == 0 else "NO",
+                    "Key": "PRI" if column["pk"] else "",
+                    "Default": column["dflt_value"],
+                    "Extra": ""
                 }
                 db_structure["tables"][table_name].append(column_info)
-        
+
         cur.close()
         return db_structure
 
-
-
-
     def find_table_and_column_by_keywords(self, keyword, sensitivity=0.8):
-        """
-        Finds and returns YAML of tables containing columns that match any of the keywords
-        based on sensitivity. All columns of matched tables are returned with types.
-
-        :param keyword: String or list of strings to search for.
-        :param sensitivity: Float between 0 and 1; higher means stricter match.
-        :return: YAML string of tables and their columns with types.
-        """
         if isinstance(keyword, str):
             keywords = [keyword]
         else:
@@ -83,14 +84,45 @@ class SqlConn:
                         matched_tables[table_name] = [
                             col['Field'] + " (" + col['Type'] + ")" for col in columns
                         ]
-                        break  # One match is enough for this table
+                        break
                 if table_name in matched_tables:
-                    break  # Stop checking columns if table is already matched
+                    break
 
         return yaml.dump(matched_tables, sort_keys=False)
-    
+
+
+
     def get_columns_for_table(self, table_name):
         db_struct = self.get_database_structure()
         tables = db_struct['tables']
-        columns = tables.get(table_name, [])
-        return columns
+        return tables.get(table_name, [])
+
+    @classmethod
+    def create_new_database(cls, csv_title, csv_string, db_name='user001.starter.db'):
+
+        csv_title = csv_title.split('.')[0].lower().replace(' ', '_')
+
+        # Ensure the base directory exists
+        if not os.path.exists(cls.base_path):
+            os.makedirs(cls.base_path)
+
+        # Write the CSV to a temporary file
+        csv_path = os.path.join(cls.base_path, csv_title + '.csv')
+        with open(csv_path, 'w') as f:
+            f.write(csv_string)
+
+        # Read the CSV
+        df = pd.read_csv(csv_path)
+
+        # Create database and write table
+        db_path = os.path.join(cls.base_path, db_name)
+        conn = sqlite3.connect(db_path)
+        df.to_sql(csv_title, conn, index=False, if_exists='replace')
+        conn.close()
+
+        # Remove the temporary CSV file
+        os.remove(csv_path)
+
+        # Return SqlConn object
+        return cls(db_name=db_name)
+

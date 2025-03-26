@@ -7,9 +7,8 @@ const ChartDisplay = ({ chartType, chartData, title }) => (
     <h2 className="text-center">{title}</h2>
     <Chart
       type={chartType}
-      data={chartData}
-      options={{ responsive: true, maintainAspectRatio: false }}
-      style={{ height: "400px" }}
+      data={chartData.data}
+      options={chartData.options}
     />
   </Card>
 );
