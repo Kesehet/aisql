@@ -151,5 +151,5 @@ if __name__ == '__main__':
     if not DEBUG:
         serve(app, port=5000)
     else:
-        app.run(debug=DEBUG)
+        app.run(debug=DEBUG, port=5000, host='0.0.0.0')
 
