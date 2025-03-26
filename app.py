@@ -24,7 +24,8 @@ def serve(path):
     if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
         return send_from_directory(app.static_folder, path)
     else:
-        return render_template('index.html')  # React entry point
+        return send_from_directory(app.static_folder, 'index.html')  # just serve the file
+
 
 query_cache = {}
 
