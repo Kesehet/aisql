@@ -28,7 +28,9 @@ const QueryCard = ({ query, chartType = "bar" }) => {
   const fetchData = async () => {
     setLoading(true);
     const databaseName = localStorage.getItem("databaseName");
-    const res = await fetch("http://"+window.location.hostname+"/request", {
+    const baseURL = `${window.location.protocol}//${window.location.hostname}:${window.location.port}/request`;
+
+    const res = await fetch(baseURL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query, databaseName }),
