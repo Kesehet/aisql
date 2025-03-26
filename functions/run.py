@@ -125,7 +125,7 @@ def get_sql_query(prompt: str, context: list = None, db_name: str = 'user001.sta
     Be very creative and thorough — don't just copy words directly. Think about synonyms, related terms, and different ways the same idea might be expressed. 
     Imagine all possible column names, table names, and SQL functions that could be relevant to this request.
     Return a comma-separated list of single-word keywords (no spaces), capturing the full scope of the request's meaning.
-    """)
+    """, file_name=random_string(10))
 
     context_file_name = ".".join([db_name, random_string(10),'json'])
 
@@ -205,6 +205,8 @@ def get_sql_query(prompt: str, context: list = None, db_name: str = 'user001.sta
     if not sql_query or not sql_query.get("query"):
         raise Exception('Failed to generate SQL query after multiple attempts.')
 
+    if os.path.exists("context/"+context_file_name):
+        os.remove("context/"+context_file_name)
     return sql_query
 
 def update_context():
