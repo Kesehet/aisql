@@ -149,7 +149,7 @@ def test():
 
 if __name__ == '__main__':
     if not DEBUG:
-        serve(app, host="0.0.0.0", port=5000)
+        serve(app, port=5000)
     else:
         app.run(debug=DEBUG)
 
