@@ -167,7 +167,8 @@ get_sql_query_tool = {
       '- You can use **nested subqueries**, but the final output must be a **single query**.\n'
       '- Avoid ambiguous column references — qualify column names with table aliases where appropriate.\n'
       '- Ensure all columns in SELECT, GROUP BY, and ORDER BY are valid and correctly referenced.\n'
-      '- Always write clear, clean, and readable SQL — avoid overly complex or unnecessary clauses.'
+      '- Always write clear, clean, and readable SQL — avoid overly complex or unnecessary clauses.\n'
+      '- Always include **ORDER BY** clause with **ASC** or **DESC** keyword when possible. This helps ensure that results are sorted consistently across different databases and systems.'
     ),
     'parameters': {
       'type': 'object',

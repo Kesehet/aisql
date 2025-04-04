@@ -3,6 +3,7 @@ import difflib
 import yaml
 import pandas as pd
 import os
+import re
 
 class SqlConn:
     base_path = './databases/'  # Set your desired base path
@@ -100,7 +101,7 @@ class SqlConn:
     @classmethod
     def create_new_database(cls, csv_title, csv_string, db_name='user001.starter.db'):
 
-        csv_title = csv_title.split('.')[0].lower().replace(' ', '_')
+        csv_title = csv_title.split('.')[0].lower().replace(' ', '_').replace('-', '_').replace('(', '').replace(')', '').strip().strip('_')
 
         # Ensure the base directory exists
         if not os.path.exists(cls.base_path):
@@ -113,6 +114,12 @@ class SqlConn:
 
         # Read the CSV
         df = pd.read_csv(csv_path)
+
+        # Make all column names lowercase and replace spaces with underscores
+        df.columns = [col.lower().replace(' ', '_') for col in df.columns]
+
+        # Remove duplicate columns and special characters
+        df = df.loc[:, ~df.columns.duplicated()].rename(columns=lambda x: re.sub(r'[^\w]+', '', x))
 
         # Create database and write table
         db_path = os.path.join(cls.base_path, db_name)

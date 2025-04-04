@@ -122,4 +122,4 @@ const getColor = (i) => {
     throw new Error("Unsupported chart type");
   };
   
-  
+  export const getDatabaseName = () => localStorage.getItem("databaseName");

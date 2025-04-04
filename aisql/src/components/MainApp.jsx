@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Dialog } from "primereact/dialog";
 import QueryForm from "./QueryForm";
 import QueryCard from "./QueryCard";
+import SqlRun from "./SqlRun";
 
 const MainApp = ({ dbName, onReset }) => {
   const [query, setQuery] = useState("");
@@ -52,6 +53,8 @@ const MainApp = ({ dbName, onReset }) => {
         ))}
       </div>
 
+      <SqlRun />
+
       <Dialog
         visible={!!selectedQuery}
         style={{ width: "90vw" }}
@@ -61,6 +64,7 @@ const MainApp = ({ dbName, onReset }) => {
       >
         {selectedQuery && <QueryCard query={selectedQuery} />}
       </Dialog>
+      
     </div>
   );
 };

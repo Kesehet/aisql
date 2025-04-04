@@ -5,10 +5,10 @@ import { MultiSelect } from "primereact/multiselect";
 import { createChartData } from "../utils/chartUtils";
 import ChartDisplay from "./ChartDisplay";
 
-const QueryCard = ({ query, chartType = "bar" }) => {
+const QueryCard = ({ query, chartType = "bar", response: initialResponse = null }) => {
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState(null);
-  const [response, setResponse] = useState(null);
+  const [response, setResponse] = useState(initialResponse);
   const [sqlQuery, setSqlQuery] = useState("");
   const [selectedChartType, setSelectedChartType] = useState(chartType);
 
@@ -25,20 +25,7 @@ const QueryCard = ({ query, chartType = "bar" }) => {
     { label: "Scatter", value: "scatter" },
   ];
 
-  const fetchData = async () => {
-    setLoading(true);
-    const databaseName = localStorage.getItem("databaseName");
-    const baseURL = `${window.location.protocol}//${window.location.hostname}:${window.location.port}/request`;
-
-    const res = await fetch(baseURL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, databaseName }),
-    });
-
-    const result = await res.json();
-    setResponse(result);
-
+  const processResponse = (result) => {
     if (result?.result) {
       const [headers] = result.result;
 
@@ -58,16 +45,34 @@ const QueryCard = ({ query, chartType = "bar" }) => {
       setChartData(data);
       setSqlQuery(result.query);
     }
+  };
 
+  const fetchData = async () => {
+    setLoading(true);
+    const databaseName = localStorage.getItem("databaseName");
+    const baseURL = `${window.location.protocol}//${window.location.hostname}:${window.location.port}/request`;
+
+    const res = await fetch(baseURL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, databaseName }),
+    });
+
+    const result = await res.json();
+    setResponse(result);
+    processResponse(result);
     setLoading(false);
   };
 
   useEffect(() => {
-    if (query) {
+    if (response) {
+      processResponse(response);
+      setLoading(false);
+    } else if (query) {
       fetchData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, selectedChartType, xField, yFields]);
+  }, [query, response, selectedChartType, xField, yFields]);
 
   const columnOptions =
     response?.result?.[0]?.map((col) => ({ label: col, value: col })) || [];

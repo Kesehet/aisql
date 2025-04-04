@@ -2,6 +2,7 @@ import traceback
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from functions.run import get_sql_query, context
 from functions.sql import SqlConn
+from functions.database import get_sql_query as sql_run
 # enable CORS
 from flask_cors import CORS
 import dotenv
@@ -113,7 +114,10 @@ def process_request():
         query_cache[query] = response
         return response
 
-# # How many invoices were generated in Yangon ?
+@app.route("/run-sql", methods=['POST'])
+def run_sql():
+    data = request.get_json()
+    return sql_run(data["query"],data["databaseName"])
 
 @app.route('/create-database', methods=['POST'])
 def create_database():
