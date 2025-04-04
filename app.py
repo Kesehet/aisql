@@ -1,6 +1,6 @@
 import traceback
 from flask import Flask, request, jsonify, render_template, send_from_directory
-from functions.run import get_sql_query, context
+from functions.run import get_sql_query, generate_questions
 from functions.sql import SqlConn
 from functions.database import get_sql_query as sql_run
 # enable CORS
@@ -139,16 +139,14 @@ def create_database():
     except Exception as e:
         return jsonify({'status': 'error', 'traceback': traceback.format_exc() }), 500
 
-
-print("curl -X POST -H 'Content-Type: application/json' -d '{\"csv_title\":\"test\",\"csv_string\":\"col1,col2\\nval1,val2\",\"db_name\":\"test.db\"}' http://localhost:5000/create-database")
-   
-
-@app.route('/test.html')
-def test():
-    with open('test_results.html', 'r') as f:
-        html = f.read()
-    return html
-
+@app.route('/get-questions', methods=['GET', 'POST'])
+def get_questions():
+    if request.headers['Content-Type'] == 'application/x-www-form-urlencoded':
+        data = request.form
+    else:
+        data = request.get_json()
+    
+    return generate_questions(db_name=data['databaseName'])
 
 
 if __name__ == '__main__':

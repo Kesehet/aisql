@@ -3,6 +3,7 @@ import { Dialog } from "primereact/dialog";
 import QueryForm from "./QueryForm";
 import QueryCard from "./QueryCard";
 import SqlRun from "./SqlRun";
+import { Button } from "primereact/button";
 
 const MainApp = ({ dbName, onReset }) => {
   const [query, setQuery] = useState("");
@@ -17,6 +18,23 @@ const MainApp = ({ dbName, onReset }) => {
     }
   };
 
+  const getQuestions = () => {
+    const baseURL = `${window.location.protocol}//${window.location.hostname}:${window.location.port}/get-questions`;
+    fetch(baseURL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ databaseName: dbName }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        for (let i = 0; i < data.length; i++) {
+          setSubmittedQueries((prev) => [...prev, data[i]]);
+        }
+      });
+  };
+
   return (
     <div className="w3-container">
       <div className="w3-blue w3-padding w3-row">
@@ -28,6 +46,9 @@ const MainApp = ({ dbName, onReset }) => {
         </div>
     </div>
 
+      <Button label="Get Questions" icon="pi pi-question" className="w3-margin-bottom" 
+        onClick={getQuestions}
+        />
 
       <QueryForm query={query} setQuery={setQuery} onSubmit={onSubmit} />
 

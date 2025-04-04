@@ -9,12 +9,14 @@ from functions.database import get_database_structure_as_context
 from functions.database import get_sql_query, get_sql_query_tool
 from functions.database import extract_keywords, extract_keywords_tool, validate_keywords, get_table_list_in_database
 from functions.database import find_table_and_column_by_keywords, find_table_and_column_by_keywords_tool
+from functions.database import get_questions_tool, get_questions
 context = []
 tools = [get_sql_query_tool]
 available_functions: Dict[str, Callable] = {
     'extract_keywords': extract_keywords,
     'find_table_and_column_by_keywords': find_table_and_column_by_keywords,
-    'get_sql_query': get_sql_query
+    'get_sql_query': get_sql_query,
+    'get_questions': get_questions
     }
 def tool_call_to_dict(tool_call):
     """
@@ -209,6 +211,42 @@ def get_sql_query(prompt: str, context: list = None, db_name: str = 'user001.sta
         os.remove("context/"+context_file_name)
     return sql_query
 
+
+def generate_questions(db_name):
+    '''
+    Get ideas for the user to ask.
+    The concept is that we will give the assistant 2 tables at a time and ask it to generate a question based on the tables.
+    '''
+    print('Generating questions...', db_name)
+    tables = get_table_list_in_database(db_name=db_name)
+    context = add_to_context([], 'user', f'''
+    Hey there, Can you help me generate some ideas for questions I can ask about my database?
+    ''')
+    context = add_to_context(context, 'assistant', f'''
+    Sure! I can help you with that. Share the tables and columns you have in your database, and I'll generate some ideas for you.
+    ''')
+    questions = []
+    for i in range(len(tables)):
+        for j in range(i + 1, len(tables)):
+            str_1 = tables[i]
+            str_2 = tables[j]
+            if str_1 == str_2:
+                continue
+            dat = find_table_and_column_by_keywords([str_1, str_2], db_name=db_name,sensitivity=1)
+
+            context = add_to_context(context, 'user',  f'''
+            I want you to generate a question based on the following tables and columns.
+            Please be creative and think about how these tables and columns can be related to each other.
+            {dat}
+            ''')
+            quest = ask(context, [get_questions_tool], db_name=db_name)
+            questions = questions + quest
+            context = add_to_context(context, 'assistant', f'''
+            Here are some ideas for questions I can ask about such a database:
+            {quest}
+            ''')
+    print('Questions:', len(questions), questions, tables)
+    return questions
 def update_context():
     global context
     with open('context.json', 'w') as f:

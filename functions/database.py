@@ -4,7 +4,6 @@ from functions.sql import SqlConn
 import logging
 from difflib import SequenceMatcher
 
-data = pd.read_csv('data.csv')
 
 def get_sql_database_structure(db_name='user001.starter.db'):
     sql = SqlConn(db_name)
@@ -153,6 +152,13 @@ def get_database_structure_as_context():
         {"role": "assistant", "content": "Understood."}
     ]
 
+def get_questions(questions):
+    print("Questions:", questions)
+    if not questions:
+        return []
+    return questions.split("?")
+    
+
 get_sql_query_tool = {
   'type': 'function',
   'function': {
@@ -233,6 +239,29 @@ find_table_and_column_by_keywords_tool = {
                 },
             },
             'required': ['keyword'],
+        },
+    },
+}
+
+get_questions_tool = {
+    'type': 'function',
+    'function': {
+        'name': 'get_questions',
+        'description': (
+            'Extracts a list of questions from a given string. The questions should be separated by question marks.'
+        ),
+        'parameters': {
+            'type': 'object',
+            'properties': {
+                'questions': {
+                    'type': 'string',
+                    'description': (
+                        'A string containing multiple questions separated by question marks. '
+                        'Example: "What is the sales data? How many customers are there?"'
+                    ),
+                },
+            },
+            'required': ['questions'],
         },
     },
 }
