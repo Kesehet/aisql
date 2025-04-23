@@ -3,6 +3,8 @@ import ollama
 from typing import Dict, Any, Callable
 import json
 import os
+import random
+import google.generativeai as genai
 
 # internal imports
 from functions.database import get_database_structure_as_context
@@ -28,6 +30,24 @@ def tool_call_to_dict(tool_call):
             "arguments": tool_call.function.arguments
         }
     }
+
+def convert_ollama_tool_to_gemini(ollama_tool: dict) -> dict:
+    if os.environ.get('USE_OLLAMA', 'False') == 'True':
+        return ollama_tool
+    if ollama_tool['type'] != 'function':
+        raise ValueError("Only 'function' tools are supported.")
+    
+    gemini_tool = {
+        "function_declarations": [
+            {
+                "name": ollama_tool['function']['name'],
+                "description": ollama_tool['function']['description'],
+                "parameters": ollama_tool['function']['parameters'],
+            }
+        ]
+    }
+    return gemini_tool
+
 
 def get_response(prompt: str, use_tools: bool = True) -> Any:
     global context
@@ -79,27 +99,48 @@ def get_response(prompt: str, use_tools: bool = True) -> Any:
     return returner
 
 def ask(context: list, tools: list, db_name: str = 'user001.starter.db') -> str:
-    # Warn if more than 1 tool is used
-    if len(tools) > 1:
-        print('Warning: More than 1 tool is being used. This is not supported.')
-    # print("Using tools:", tools[0]["function"]["name"])
-    response = ollama.chat(
-        os.environ.get('OLLAMA_MODEL'),
-        messages=context,
-        tools=tools,
+    # Configure Gemini API
+    genai.configure(api_key=os.environ.get('GEMINI_API_KEY'))
+
+    # Prepare tools and context
+    converted_tools = [convert_ollama_tool_to_gemini(tool) for tool in tools]
+    gemini_context = convert_ollama_context_to_gemini(context)
+
+    # Initialize model with tools
+    model = genai.GenerativeModel(
+        model_name='gemini-2.0-flash',
+        tools=converted_tools,
     )
 
-    if response.message.tool_calls:
-        for tool in response.message.tool_calls:
-            # print('Calling function:', tool.function.name)
-            if function_to_call := available_functions.get(tool.function.name):
-                # if function has optional argument called db_name and it is not provided, use the default db_name
-                if 'db_name' in function_to_call.__code__.co_varnames and 'db_name' not in tool.function.arguments:
-                    print('Using default db_name:', db_name)
-                    tool.function.arguments['db_name'] = db_name
-                return function_to_call(**tool.function.arguments)
-    print("Warning: No tool call was made.", response.message.tool_calls)
-    return response
+    # Start chat session
+    chat = model.start_chat(history=gemini_context)
+
+    # Send latest user message
+    user_message = gemini_context[-1]['parts'][0]['text']
+    response = chat.send_message(user_message)
+
+    # Handle tool calls if any
+    if hasattr(response, 'candidates') and response.candidates:
+        for candidate in response.candidates:
+            if hasattr(candidate, 'content') and candidate.content.parts:
+                for part in candidate.content.parts:
+                    if hasattr(part, 'function_call'):
+                        function_call = part.function_call
+                        func_name = function_call.name
+                        if function_call.args:
+                            args = dict(function_call.args)
+                        else:
+                            args = {}
+
+
+                        function_to_call = available_functions.get(func_name)
+                        if function_to_call:
+                            if 'db_name' in function_to_call.__code__.co_varnames and 'db_name' not in args:
+                                args['db_name'] = db_name
+                            return function_to_call(**args)
+
+    # No tool call was made; return normal model text
+    return response.text
 
 def add_to_context(context: list, role: str, content: str = '', file_name: str = 'context') -> list:
     context.append({'role': role, 'content': content})
@@ -108,6 +149,40 @@ def add_to_context(context: list, role: str, content: str = '', file_name: str =
     with open( "context/"+file_name + '.json', 'w') as f:
         json.dump(context, f, indent=4)
     return context
+
+
+def convert_ollama_context_to_gemini(context: list) -> list:
+    role_mapping = {
+        "user": "user",
+        "assistant": "model",
+        "tool": "model"
+    }
+
+    gemini_context = []
+    for message in context:
+        original_role = message.get("role", "user")
+        mapped_role = role_mapping.get(original_role)
+
+        if not mapped_role:
+            print(f"Skipping unsupported role: {original_role}")
+            continue
+        
+        content = message.get("content", "")
+        if not content.strip():
+            print(f"Skipping empty content for role: {original_role}")
+            continue
+
+        gemini_message = {
+            "role": mapped_role,
+            "parts": [{"text": content}]
+        }
+        gemini_context.append(gemini_message)
+
+    return gemini_context
+
+
+
+
 
 def random_string(length: int) -> str:
     import string
@@ -129,7 +204,7 @@ def get_sql_query(prompt: str, context: list = None, db_name: str = 'user001.sta
     Return a comma-separated list of single-word keywords (no spaces), capturing the full scope of the request's meaning.
     """, file_name=random_string(10))
 
-    context_file_name = ".".join([db_name, random_string(10),'json'])
+    context_file_name = ".".join([db_name, "sql", random_string(10),'json'])
 
     
     tables = get_table_list_in_database(db_name=db_name)
@@ -141,12 +216,16 @@ def get_sql_query(prompt: str, context: list = None, db_name: str = 'user001.sta
     else:
         raw_keywords = ask(context, [extract_keywords_tool], db_name=db_name)
 
+    if type(raw_keywords) == str:
+        raw_keywords = extract_keywords(raw_keywords)
+
     keywords = validate_keywords(sub_keywords + raw_keywords, db_name=db_name)
     context = add_to_context(context, 'assistant', f'Are these valid keywords? {", ".join(keywords)}.', file_name=context_file_name)
 
     # Step 2: Validate keywords with the user
     max_attempts = 3
     attempts = 0
+    sensitivity = 0.8
     while len(keywords) == 0 and attempts < max_attempts:
         context = add_to_context(context, 'user', f'''
         None of the keywords were found in the database.
@@ -154,7 +233,7 @@ def get_sql_query(prompt: str, context: list = None, db_name: str = 'user001.sta
         ```{prompt}```''', file_name=context_file_name)
 
         raw_keywords = ask(context, [extract_keywords_tool], db_name=db_name)
-        keywords = validate_keywords(sub_keywords + raw_keywords, db_name=db_name)
+        keywords = validate_keywords(sub_keywords + raw_keywords,sensitivity=sensitivity/(attempts+1), db_name=db_name)
         print("Keywords finalized are ", keywords)
         context = add_to_context(context, 'assistant', f'Are these valid keywords? {", ".join(keywords)}.', file_name=context_file_name)
         attempts += 1
@@ -162,7 +241,7 @@ def get_sql_query(prompt: str, context: list = None, db_name: str = 'user001.sta
     if len(keywords) == 0:
         raise Exception('No valid keywords found.')
 
-    print('Keywords:', keywords)
+    print('Keywords:', keywords, sensitivity)
     context = add_to_context(context, 'user', f'Yes, {", ".join(keywords)} are valid.', file_name=context_file_name)
 
 
@@ -171,8 +250,8 @@ def get_sql_query(prompt: str, context: list = None, db_name: str = 'user001.sta
     '''
     Step 3: Identify relevant tables and columns using the confirmed keywords.
     '''
-    table_and_column = find_table_and_column_by_keywords(keywords, db_name=db_name)
-    print('Table and Column:', table_and_column)
+    table_and_column = find_table_and_column_by_keywords(keywords, sensitivity=sensitivity, db_name=db_name)
+    print('Table and Column:', table_and_column, sensitivity)
     context = add_to_context(context, 'assistant', f'Table and Column: {table_and_column}', file_name=context_file_name)
 
     '''
@@ -212,41 +291,61 @@ def get_sql_query(prompt: str, context: list = None, db_name: str = 'user001.sta
     return sql_query
 
 
-def generate_questions(db_name):
-    '''
-    Get ideas for the user to ask.
-    The concept is that we will give the assistant 2 tables at a time and ask it to generate a question based on the tables.
-    '''
-    print('Generating questions...', db_name)
-    tables = get_table_list_in_database(db_name=db_name)
-    context = add_to_context([], 'user', f'''
-    Hey there, Can you help me generate some ideas for questions I can ask about my database?
-    ''')
-    context = add_to_context(context, 'assistant', f'''
-    Sure! I can help you with that. Share the tables and columns you have in your database, and I'll generate some ideas for you.
-    ''')
-    questions = []
-    for i in range(len(tables)):
-        for j in range(i + 1, len(tables)):
-            str_1 = tables[i]
-            str_2 = tables[j]
-            if str_1 == str_2:
-                continue
-            dat = find_table_and_column_by_keywords([str_1, str_2], db_name=db_name,sensitivity=1)
 
-            context = add_to_context(context, 'user',  f'''
-            I want you to generate a question based on the following tables and columns.
-            Please be creative and think about how these tables and columns can be related to each other.
-            {dat}
-            ''')
-            quest = ask(context, [get_questions_tool], db_name=db_name)
-            questions = questions + quest
+
+def generate_questions(db_name):
+    """
+    Generate creative question ideas by combining tables two at a time.
+    """
+    context_file_name = ".".join([db_name, "question", random_string(19), "json"])
+    print('Generating questions...', db_name)
+
+    tables = get_table_list_in_database(db_name=db_name)
+    if len(tables) < 2:
+        print('Not enough tables to generate questions.')
+        return []
+
+    context = add_to_context([], 'user', '''
+    Hey there, can you help me generate some ideas for questions I can ask about my database?
+    ''', file_name=context_file_name)
+
+    context = add_to_context(context, 'assistant', '''
+    Sure! Share the tables and columns, and I’ll create some questions for you.
+    ''', file_name=context_file_name)
+
+    questions = []
+
+    table_pairs = [(tables[i], tables[j]) for i in range(len(tables)) for j in range(i + 1, len(tables))]
+    random.shuffle(table_pairs)
+
+    for str_1, str_2 in table_pairs:
+        keywords = extract_keywords(str_1) + extract_keywords(str_2)
+        table_info = find_table_and_column_by_keywords(keywords, db_name=db_name, sensitivity=0.3)
+
+        if not table_info:
+            print(f'No relevant data for: {str_1}, {str_2}')
+            continue
+
+        context = add_to_context(context, 'user', f'''
+        Please generate creative and insightful questions involving the following tables and columns:
+        {table_info}
+        Think of real-world scenarios where these tables might interact.
+        ''', file_name=context_file_name)
+
+        new_questions = ask(context, [get_questions_tool], db_name=db_name)
+
+        if new_questions:
+            questions.extend(new_questions)
             context = add_to_context(context, 'assistant', f'''
-            Here are some ideas for questions I can ask about such a database:
-            {quest}
-            ''')
-    print('Questions:', len(questions), questions, tables)
+            Here are some generated questions:
+            {new_questions}
+            ''', file_name=context_file_name)
+        break
+    questions = list(set(questions))  # Remove duplicates
+    questions = [question for question in questions if question.strip()]  # Remove empty strings
+
     return questions
+
 def update_context():
     global context
     with open('context.json', 'w') as f:

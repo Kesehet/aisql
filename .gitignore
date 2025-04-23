@@ -23,4 +23,5 @@ cypress/screenshots/
 cypress/videos/
 context/*
 databases/*
+D/*
 

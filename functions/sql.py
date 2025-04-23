@@ -10,7 +10,6 @@ class SqlConn:
     def __init__(self, db_name="user001.starter.db" ):
         if not os.path.exists(self.base_path):
             os.makedirs(self.base_path)
-        print("------Database path:", self.base_path , db_name)
         self.db_path = self.base_path + db_name
 
         if not os.path.exists(self.db_path):
@@ -51,13 +50,16 @@ class SqlConn:
 
             db_structure["tables"][table_name] = []
             for column in columns:
+                common_values = self.execute(f"SELECT DISTINCT {column[1]} FROM {table_name} LIMIT 5")
+                common_values = [str(value[0]) for value in common_values[1]] if common_values[1] else []
                 column_info = {
                     "Field": column["name"],
                     "Type": column["type"],
                     "Null": "YES" if column["notnull"] == 0 else "NO",
                     "Key": "PRI" if column["pk"] else "",
                     "Default": column["dflt_value"],
-                    "Extra": ""
+                    "Extra": "",
+                    "Common Values": common_values,
                 }
                 db_structure["tables"][table_name].append(column_info)
 
@@ -83,7 +85,7 @@ class SqlConn:
                     ratio = difflib.SequenceMatcher(None, kw.lower(), column_name.lower()).ratio()
                     if ratio >= sensitivity:
                         matched_tables[table_name] = [
-                            col['Field'] + " (" + col['Type'] + ")" for col in columns
+                            col['Field'] + " (" + col['Type'] + ")" + (" - (" + ",".join(col['Common Values']) if col['Common Values'] else "") + ")" for col in columns
                         ]
                         break
                 if table_name in matched_tables:

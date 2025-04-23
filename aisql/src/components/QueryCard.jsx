@@ -4,6 +4,9 @@ import { Dropdown } from "primereact/dropdown";
 import { MultiSelect } from "primereact/multiselect";
 import { createChartData } from "../utils/chartUtils";
 import ChartDisplay from "./ChartDisplay";
+import { Accordion, AccordionTab } from "primereact/accordion";
+import { DataTable } from "primereact/datatable";
+import { Column } from "primereact/column";
 
 const QueryCard = ({ query, chartType = "bar", response: initialResponse = null }) => {
   const [loading, setLoading] = useState(true);
@@ -16,6 +19,7 @@ const QueryCard = ({ query, chartType = "bar", response: initialResponse = null 
   const [yFields, setYFields] = useState([]);
 
   const chartTypes = [
+    { label: "Table", value:"table"},
     { label: "Bar", value: "bar" },
     { label: "Line", value: "line" },
     { label: "Pie", value: "pie" },
@@ -27,7 +31,7 @@ const QueryCard = ({ query, chartType = "bar", response: initialResponse = null 
 
   const processResponse = (result) => {
     if (result?.result) {
-      const [headers] = result.result;
+      const [headers, rows] = result.result;
 
       // Set default x/y fields if not already set
       if (!xField) setXField(headers[0]);
@@ -79,49 +83,63 @@ const QueryCard = ({ query, chartType = "bar", response: initialResponse = null 
 
   return (
     <div>
-      {loading ? (
-        <div className="w3-center">
-          <ProgressSpinner />
-        </div>
-      ) : chartData ? (
-        <>
-          <div className="mb-3 flex gap-3 flex-wrap align-items-center">
-            <Dropdown
-              value={selectedChartType}
-              options={chartTypes}
-              onChange={(e) => setSelectedChartType(e.value)}
-              placeholder="Select Chart Type"
-            />
-            <Dropdown
-              value={xField}
-              options={columnOptions}
-              onChange={(e) => setXField(e.value)}
-              placeholder="Select X Field"
-              disabled={["pie", "doughnut", "polarArea"].includes(selectedChartType)}
-            />
-            <MultiSelect
-              value={yFields}
-              options={columnOptions}
-              onChange={(e) => setYFields(e.value)}
-              placeholder="Select Y Field(s)"
-              display="chip"
-              disabled={["pie", "doughnut", "polarArea"].includes(selectedChartType)}
-              style={{ minWidth: "200px" }}
-            />
-          </div>
+      <div className="card">
+        <Accordion>
+          <AccordionTab header={query}>
+            {loading ? (
+              <div className="w3-center">
+                <ProgressSpinner />
+              </div>
+            ) : chartData ? (
+              <>
+                <div className="mb-3 flex gap-3 flex-wrap align-items-center">
+                  <Dropdown
+                    value={selectedChartType}
+                    options={chartTypes}
+                    onChange={(e) => setSelectedChartType(e.value)}
+                    placeholder="Select Chart Type"
+                  />
+                  <Dropdown
+                    value={xField}
+                    options={columnOptions}
+                    onChange={(e) => setXField(e.value)}
+                    placeholder="Select X Field"
+                    disabled={["pie", "doughnut", "polarArea"].includes(selectedChartType)}
+                  />
+                  <MultiSelect
+                    value={yFields}
+                    options={columnOptions}
+                    onChange={(e) => setYFields(e.value)}
+                    placeholder="Select Y Field(s)"
+                    display="chip"
+                    disabled={["pie", "doughnut", "polarArea"].includes(selectedChartType)}
+                    style={{ minWidth: "200px" }}
+                  />
+                </div>
 
-          <ChartDisplay
-            chartType={selectedChartType}
-            chartData={chartData}
-            title={query}
-          />
-          <pre>
-            <code>{sqlQuery}</code>
-          </pre>
-        </>
-      ) : (
-        <p>No data to display.</p>
-      )}
+                {selectedChartType === "table" ? (
+                  <DataTable value={chartData.data}>
+                    {chartData.options.columns.map((col) => (
+                      <Column key={col.field} field={col.field} header={col.header} />
+                    ))}
+                  </DataTable>
+                ) : (
+                  <ChartDisplay
+                    chartType={selectedChartType}
+                    chartData={chartData}
+                    title={query}
+                  />
+                )}
+                <pre>
+                  <code>{sqlQuery}</code>
+                </pre>
+              </>
+            ) : (
+              <p>No data to display.</p>
+            )}
+          </AccordionTab>
+        </Accordion>
+      </div>
     </div>
   );
 };

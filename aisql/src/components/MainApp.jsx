@@ -66,7 +66,7 @@ const MainApp = ({ dbName, onReset }) => {
                 ? " w3-half"
                 : q.length < 80
                 ? " w3-quarter"
-                : "")
+                : "w3-half")
             }
           >
             <QueryCard query={q} />

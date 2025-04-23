@@ -18,6 +18,14 @@ CORS(app)
 FAKE_CHARTS = os.getenv("FAKE_CHARTS") == "true" or os.getenv("FAKE_CHARTS") == "1" or os.getenv("FAKE_CHARTS") == "True"
 DEBUG = os.getenv("DEBUG") == "true" or os.getenv("DEBUG") == "1" or os.getenv("DEBUG") == "True"
 
+print(f'''
+
+Running in {'DEBUG' if DEBUG else 'PRODUCTION'} mode
+
+Model : {os.getenv("OLLAMA_MODEL")}
+
+''')
+
 # Serve static files and fallback to index.html for React-style routing
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
@@ -151,7 +159,7 @@ def get_questions():
 
 if __name__ == '__main__':
     if not DEBUG:
-        serve(app, port=5000)
+        serve(app, port=3000)
     else:
-        app.run(debug=DEBUG, port=5000, host='0.0.0.0')
+        app.run(debug=DEBUG, port=3000, host='0.0.0.0')
 

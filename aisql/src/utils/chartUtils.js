@@ -118,6 +118,17 @@ const getColor = (i) => {
         options: commonOptions,
       };
     }
+
+    if (chartType === "table") {
+      const columns = headers.map((header) => ({
+        field: header,
+        header,
+      }));
+      return {
+        data: rows.map((row) => Object.fromEntries(headers.map((h) => [h, row[h]]))),
+        options: { columns },
+      };
+    }
   
     throw new Error("Unsupported chart type");
   };

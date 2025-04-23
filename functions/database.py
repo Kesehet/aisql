@@ -3,6 +3,7 @@ import pandas as pd
 from functions.sql import SqlConn
 import logging
 from difflib import SequenceMatcher
+import re
 
 
 def get_sql_database_structure(db_name='user001.starter.db'):
@@ -23,8 +24,11 @@ def extract_keywords(text):
     and removing the trailing 's'.
     '''
     # sanitize input
-    text = str(text).split(' ')
-    text = ",".join(text)
+    words = re.split(r'[^a-zA-Z0-9]+', text)
+
+    # Remove any empty strings
+    words = [word for word in words if word]
+    text = ",".join(words)
     print("Input for extract_keywords:", text)
     if not text:
         return []
@@ -165,6 +169,7 @@ get_sql_query_tool = {
     'name': 'get_sql_query',
     'description': (
       'Generate a single valid SQL SELECT query to retrieve the desired information.\n\n'
+      'This query will be used to generate a chart.js chart.\n\n'
       'Guidelines:\n'
       '- Only generate **SELECT** statements. No INSERT, UPDATE, DELETE, etc.\n'
       # '- Avoid Select * statements and use explicit column names or aliases.\n'
@@ -248,7 +253,9 @@ get_questions_tool = {
     'function': {
         'name': 'get_questions',
         'description': (
-            'Extracts a list of questions from a given string. The questions should be separated by question marks.'
+            'Extracts a list of broad, graph-oriented questions from a given string. '
+            'The questions should be separated by question marks and should focus on exploring various aspects of the data, '
+            'such as trends, comparisons, distributions, or relationships, rather than specific values.'
         ),
         'parameters': {
             'type': 'object',
@@ -256,8 +263,10 @@ get_questions_tool = {
                 'questions': {
                     'type': 'string',
                     'description': (
-                        'A string containing multiple questions separated by question marks. '
-                        'Example: "What is the sales data? How many customers are there?"'
+                        'A string containing multiple broad questions separated by question marks. '
+                        'Use technical terms and column names where appropriate. '
+                        'These questions should aim to explore data comprehensively, such as "What are the trends in sales over time? "'
+                        '"How do customer demographics compare across regions? What is the distribution of product categories? Why did my sales drop last month?" '
                     ),
                 },
             },
